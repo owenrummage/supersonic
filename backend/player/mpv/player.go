@@ -109,7 +109,7 @@ func (p *Player) Init(maxCacheMB int) error {
 		m.SetOptionString("audio-display", "no")
 		m.SetOptionString("gapless-audio", "weak")
 		m.SetOptionString("prefetch-playlist", "yes")
-		m.SetOptionString("force-seekable", "yes")
+		
 		m.SetOptionString("terminal", "no")
 
 		// limit in-memory cache size
