@@ -19,6 +19,8 @@ To build Supersonic from source, first clone the Git repo or download the source
 ### Build
 * clone the repo, CD into the repo root, and run ``make build``
 * (note that the first build will take some time as it will download and build the UI library)
+* run ``make user-install`` to install for the current user (including a Wofi-compatible desktop entry), or ``sudo make install`` for a system-wide installation
+* use ``make user-uninstall`` or ``sudo make uninstall`` to remove the corresponding installation
 
 ### Generate installable .tar.xz bundle
 * install the ``fyne`` packaging tool ``go install fyne.io/fyne/v2/cmd/fyne@latest``
