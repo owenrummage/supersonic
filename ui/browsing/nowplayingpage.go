@@ -402,7 +402,10 @@ func (a *NowPlayingPage) updateLyrics() {
 			return
 		}
 	}
-	if a.nowPlaying == nil || a.nowPlaying.Metadata().Type == mediaprovider.MediaItemTypeRadioStation {
+	tr, isTrack := a.nowPlaying.(*mediaprovider.Track)
+	if !isTrack {
+		a.lyricsLoading.Stop()
+		a.lyricsViewer.EnableTapToSeek()
 		a.lyricsViewer.SetLyrics(nil)
 		a.curLyrics = nil
 		a.curLyricsID = ""
@@ -417,8 +420,6 @@ func (a *NowPlayingPage) updateLyrics() {
 		Synced: true,
 		Lines:  []mediaprovider.LyricLine{{Text: ""}},
 	})
-	tr, _ := a.nowPlaying.(*mediaprovider.Track)
-
 	a.lm.FetchLyricsAsync(tr, func(id string, lyrics *mediaprovider.Lyrics) {
 		if id != a.nowPlayingID {
 			return

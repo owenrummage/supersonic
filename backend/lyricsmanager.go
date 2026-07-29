@@ -28,6 +28,13 @@ func NewLyricsManager(sm *ServerManager, lrclib *LrcLibFetcher) *LyricsManager {
 }
 
 func (lm *LyricsManager) FetchLyricsAsync(song *mediaprovider.Track, cb func(string, *mediaprovider.Lyrics)) {
+	if song == nil {
+		if cb != nil {
+			cb("", nil)
+		}
+		return
+	}
+
 	lm.lock.Lock()
 	defer lm.lock.Unlock()
 

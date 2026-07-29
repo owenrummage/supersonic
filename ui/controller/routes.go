@@ -16,6 +16,7 @@ const (
 	Playlists
 	Tracks
 	Radios
+	Podcasts
 )
 
 func (p PageName) String() string {
@@ -44,6 +45,8 @@ func (p PageName) String() string {
 		return "All Tracks"
 	case Radios:
 		return "Internet Radio Stations"
+	case Podcasts:
+		return "Podcasts"
 	default:
 		return ""
 	}
@@ -101,6 +104,8 @@ func ArtistsRoute() Route {
 func RadiosRoute() Route {
 	return Route{Page: Radios}
 }
+
+func PodcastsRoute() Route { return Route{Page: Podcasts} }
 
 func NowPlayingRoute() Route {
 	return Route{Page: NowPlaying}

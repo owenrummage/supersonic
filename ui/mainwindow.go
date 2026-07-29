@@ -369,6 +369,8 @@ func (m *MainWindow) RunOnServerConnectedTasks(serverConf *backend.ServerConfig,
 
 		_, supportsRadio := m.App.ServerManager.Server.(mediaprovider.RadioProvider)
 		m.Toolbar.SetRadioButtonVisible(supportsRadio)
+		_, supportsPodcasts := m.App.ServerManager.Server.(mediaprovider.PodcastProvider)
+		m.Toolbar.SetPodcastButtonVisible(serverConf.EnablePodcasts && supportsPodcasts)
 	})
 
 	m.App.SaveConfigFile()

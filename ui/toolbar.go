@@ -28,6 +28,7 @@ type Toolbar struct {
 	navBtnsContainer *fyne.Container
 	navBtnsPageMap   map[controller.PageName]fyne.Resource
 	radioBtn         fyne.CanvasObject
+	podcastBtn       fyne.CanvasObject
 
 	quickSearchBtn *ttwidget.Button
 	sidebarBtn     *ttwidget.Button
@@ -79,6 +80,14 @@ func (t *Toolbar) SetRadioButtonVisible(vis bool) {
 		t.radioBtn.Show()
 	} else {
 		t.radioBtn.Hide()
+	}
+}
+
+func (t *Toolbar) SetPodcastButtonVisible(vis bool) {
+	if vis {
+		t.podcastBtn.Show()
+	} else {
+		t.podcastBtn.Hide()
 	}
 }
 
@@ -170,6 +179,10 @@ func (t *Toolbar) setupNavigationButtons(navigateFn func(controller.Route)) {
 	t.radioBtn = t.addNavigationButton(myTheme.RadioIcon, controller.Radios, func() {
 		navigateFn(controller.RadiosRoute())
 	})
+	t.podcastBtn = t.addNavigationButton(myTheme.HeadphonesIcon, controller.Podcasts, func() {
+		navigateFn(controller.PodcastsRoute())
+	})
+	t.podcastBtn.Hide()
 }
 
 func (t *Toolbar) addNavigationButton(icon fyne.Resource, pageName controller.PageName, action func()) *ttwidget.Button {

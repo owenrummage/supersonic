@@ -106,7 +106,10 @@ func (s *Sidebar) updateLyrics() {
 			return
 		}
 	}
-	if s.nowPlaying == nil || s.nowPlaying.Metadata().Type == mediaprovider.MediaItemTypeRadioStation {
+	tr, isTrack := s.nowPlaying.(*mediaprovider.Track)
+	if !isTrack {
+		s.lyricsLoading.Stop()
+		s.lyricsViewer.EnableTapToSeek()
 		s.lyricsViewer.SetLyrics(nil)
 		s.curLyrics = nil
 		s.curLyricsID = ""
@@ -121,8 +124,6 @@ func (s *Sidebar) updateLyrics() {
 		Synced: true,
 		Lines:  []mediaprovider.LyricLine{{Text: ""}},
 	})
-	tr, _ := s.nowPlaying.(*mediaprovider.Track)
-
 	s.lm.FetchLyricsAsync(tr, func(id string, lyrics *mediaprovider.Lyrics) {
 		if id != s.nowPlayingID {
 			return

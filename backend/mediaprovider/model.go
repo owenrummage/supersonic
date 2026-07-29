@@ -221,7 +221,43 @@ type MediaItemType int
 const (
 	MediaItemTypeTrack MediaItemType = iota
 	MediaItemTypeRadioStation
+	MediaItemTypePodcastEpisode
 )
+
+type PodcastChannel struct {
+	ID, URL, Title, Description, CoverArtID, OriginalImageURL, Status, ErrorMessage string
+	Episodes                                                                        []*PodcastEpisode
+}
+
+type PodcastEpisode struct {
+	ID, StreamID, ChannelID, Title, Description, Status, CoverArtID, OriginalImageURL, ChannelTitle string
+	PublishDate                                                                                     time.Time
+	Duration                                                                                        time.Duration
+	Size                                                                                            int64
+	BitRate                                                                                         int
+	ContentType                                                                                     string
+}
+
+func (p *PodcastEpisode) Playable() bool {
+	return p != nil && p.Status == "completed" && p.StreamID != ""
+}
+
+func (p *PodcastEpisode) Metadata() MediaItemMetadata {
+	if p == nil {
+		return MediaItemMetadata{}
+	}
+	return MediaItemMetadata{Type: MediaItemTypePodcastEpisode, MIMEType: p.ContentType,
+		ID: p.ID, Name: p.Title, Artists: []string{p.ChannelTitle}, Album: p.ChannelTitle,
+		CoverArtID: p.CoverArtID, Duration: p.Duration, Size: p.Size, BitRate: p.BitRate}
+}
+
+func (p *PodcastEpisode) Copy() MediaItem {
+	if p == nil {
+		return nil
+	}
+	c := *p
+	return &c
+}
 
 type MediaItemMetadata struct {
 	Type         MediaItemType

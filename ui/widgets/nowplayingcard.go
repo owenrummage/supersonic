@@ -23,8 +23,9 @@ import (
 type NowPlayingCard struct {
 	widget.BaseWidget
 
-	DisableRating bool
-	ShowAlbumYear bool
+	DisableRating  bool
+	DisableSharing bool
+	ShowAlbumYear  bool
 
 	trackName  *OptionHyperlink
 	artistName *MultiHyperlink
@@ -33,7 +34,9 @@ type NowPlayingCard struct {
 	menu       *widget.PopUpMenu
 	ratingMenu *fyne.MenuItem
 
-	albumYear string
+	albumYear               string
+	isPodcast               bool
+	podcastSharingAvailable bool
 
 	OnTrackNameTapped  func()
 	OnArtistNameTapped func(artistID string)
@@ -144,6 +147,8 @@ func (n *NowPlayingCard) Update(track mediaprovider.MediaItem) {
 		n.artistName.BuildSegments([]string{}, []string{})
 		n.albumName.BuildSegments([]string{}, []string{})
 		n.albumYear = ""
+		n.isPodcast = false
+		n.podcastSharingAvailable = false
 		n.cover.Hidden = true
 	} else {
 		n.cover.Hidden = false
@@ -153,15 +158,25 @@ func (n *NowPlayingCard) Update(track mediaprovider.MediaItem) {
 			n.albumName.BuildSegments([]string{tr.Album}, []string{tr.AlbumID})
 			n.albumYear = strconv.Itoa(tr.Year)
 			n.cover.PlaceholderIcon = myTheme.TracksIcon
+		} else if episode, ok := track.(*mediaprovider.PodcastEpisode); ok {
+			n.artistName.BuildSegments([]string{episode.ChannelTitle}, nil)
+			n.albumName.BuildSegments([]string{}, []string{})
+			n.albumYear = ""
+			n.cover.PlaceholderIcon = myTheme.RadioIcon
+			n.isPodcast = true
+			n.podcastSharingAvailable = episode.StreamID != ""
 		} else {
 			n.artistName.BuildSegments([]string{}, []string{})
 			n.albumName.BuildSegments([]string{}, []string{})
 			n.albumName.Suffix = ""
 			n.cover.PlaceholderIcon = myTheme.RadioIcon
+			n.isPodcast = false
+			n.podcastSharingAvailable = false
 		}
 	}
 	n.trackName.Hidden = n.trackName.Text() == ""
-	n.trackName.SetMenuBtnEnabled(n.cover.PlaceholderIcon != myTheme.RadioIcon)
+	n.trackName.SetMenuBtnEnabled(n.cover.PlaceholderIcon != myTheme.RadioIcon ||
+		(n.isPodcast && n.podcastSharingAvailable && !n.DisableSharing))
 	n.artistName.Hidden = len(n.artistName.Segments) == 0
 	n.albumName.Hidden = len(n.albumName.Segments) == 0
 	n.Refresh()
@@ -181,7 +196,11 @@ func (n *NowPlayingCard) Refresh() {
 }
 
 func (n *NowPlayingCard) showMenu(btnPos fyne.Position) {
-	if n.menu == nil {
+	if n.isPodcast {
+		share := fyne.NewMenuItem(lang.L("Share")+"...", func() { n.onShare() })
+		share.Icon = myTheme.ShareIcon
+		n.menu = widget.NewPopUpMenu(fyne.NewMenu("", share), fyne.CurrentApp().Driver().CanvasForObject(n))
+	} else {
 		n.ratingMenu = util.NewRatingSubmenu(n.onSetRating)
 		favorite := fyne.NewMenuItem(lang.L("Set favorite"), func() { n.onSetFavorite(true) })
 		favorite.Icon = myTheme.FavoriteIcon
@@ -193,12 +212,15 @@ func (n *NowPlayingCard) showMenu(btnPos fyne.Position) {
 		info.Icon = theme.InfoIcon()
 		share := fyne.NewMenuItem(lang.L("Share")+"...", func() { n.onShare() })
 		share.Icon = myTheme.ShareIcon
+		share.Disabled = n.DisableSharing
 
 		m := fyne.NewMenu("", favorite, unfavorite, n.ratingMenu, playlist, info, share)
 		n.menu = widget.NewPopUpMenu(m, fyne.CurrentApp().Driver().CanvasForObject(n))
 	}
 	menuSize := n.menu.MinSize()
-	n.ratingMenu.Disabled = n.DisableRating
+	if !n.isPodcast {
+		n.ratingMenu.Disabled = n.DisableRating
+	}
 	btnPos.Y -= (menuSize.Height + theme.Padding()*3)
 	btnPos.X -= menuSize.Width / 2
 	n.menu.ShowAtPosition(btnPos)

@@ -17,16 +17,17 @@ import (
 type AddEditServerDialog struct {
 	widget.BaseWidget
 
-	ServerType    backend.ServerType
-	Nickname      string
-	Host          string
-	AltHost       string
-	Username      string
-	Password      string
-	LegacyAuth    bool
-	SkipSSLVerify bool
-	OnSubmit      func()
-	OnCancel      func()
+	ServerType     backend.ServerType
+	Nickname       string
+	Host           string
+	AltHost        string
+	Username       string
+	Password       string
+	LegacyAuth     bool
+	SkipSSLVerify  bool
+	EnablePodcasts bool
+	OnSubmit       func()
+	OnCancel       func()
 
 	passField  *widget.Entry
 	submitBtn  *widget.Button
@@ -47,17 +48,21 @@ func NewAddEditServerDialog(title string, cancelable bool, prefillServer *backen
 		a.Username = prefillServer.Username
 		a.LegacyAuth = prefillServer.LegacyAuth
 		a.SkipSSLVerify = prefillServer.SkipSSLVerify
+		a.EnablePodcasts = prefillServer.EnablePodcasts
 	}
 
 	titleLabel := widget.NewLabel(title)
 	titleLabel.TextStyle.Bold = true
 	legacyAuthCheck := widget.NewCheckWithData(lang.L("Use legacy authentication"), binding.BindBool(&a.LegacyAuth))
+	podcastsCheck := widget.NewCheckWithData(lang.L("Enable podcasts"), binding.BindBool(&a.EnablePodcasts))
 	serverTypeChoice := widget.NewRadioGroup([]string{"Subsonic", "Jellyfin"}, func(s string) {
 		a.ServerType = backend.ServerType(s)
 		if s == string(backend.ServerTypeSubsonic) {
 			legacyAuthCheck.Show()
+			podcastsCheck.Show()
 		} else {
 			legacyAuthCheck.Hide()
+			podcastsCheck.Hide()
 		}
 	})
 	skipSSLCheck := widget.NewCheckWithData(lang.L("Skip SSL certificate verification"), binding.BindBool(&a.SkipSSLVerify))
@@ -116,7 +121,7 @@ func NewAddEditServerDialog(title string, cancelable bool, prefillServer *backen
 			widget.NewLabel(lang.L("Password")),
 			a.passField,
 		),
-		container.NewHBox(layout.NewSpacer(), legacyAuthCheck, skipSSLCheck),
+		container.NewVBox(podcastsCheck, legacyAuthCheck, skipSSLCheck),
 		widget.NewSeparator(),
 		bottomRow,
 	)

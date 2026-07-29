@@ -196,6 +196,15 @@ type Server interface {
 	MediaProvider() MediaProvider
 }
 
+// PodcastProvider is implemented by Subsonic servers with the standard podcast API.
+// Podcast IDs are opaque and must never be converted to numeric IDs.
+type PodcastProvider interface {
+	GetPodcastChannels() ([]*PodcastChannel, error)
+	GetPodcastChannel(id string) (*PodcastChannel, error)
+	GetNewestPodcastEpisodes(count int) ([]*PodcastEpisode, error)
+	GetPodcastEpisode(id string) (*PodcastEpisode, error)
+}
+
 type MediaProvider interface {
 	SetPrefetchCoverCallback(cb func(coverArtID string))
 

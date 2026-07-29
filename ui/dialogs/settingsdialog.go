@@ -801,6 +801,11 @@ func (s *SettingsDialog) createAdvancedTab() *container.TabItem {
 	multi := widget.NewCheckWithData(lang.L("Allow multiple app instances"), binding.BindBool(&s.config.Application.AllowMultiInstance))
 	update := widget.NewCheckWithData(lang.L("Automatically check for updates"), binding.BindBool(&s.config.Application.EnableAutoUpdateChecker))
 	lrclib := widget.NewCheckWithData(lang.L("Enable LrcLib lyrics fetcher"), binding.BindBool(&s.config.Application.EnableLrcLib))
+	savePasswords := widget.NewCheck(lang.L("Save passwords on this device"), func(enabled bool) {
+		s.config.Application.EnablePasswordStorage = enabled
+		s.setRestartRequired()
+	})
+	savePasswords.Checked = s.config.Application.EnablePasswordStorage
 
 	threeDigitValidator := func(text, selText string, r rune) bool {
 		return unicode.IsDigit(r) && len(text)-len(selText) < 3
@@ -842,6 +847,7 @@ func (s *SettingsDialog) createAdvancedTab() *container.TabItem {
 		multi,
 		update,
 		lrclib,
+		savePasswords,
 		osMediaAPIs,
 		preventScreensaver,
 		imgCacheCfg,

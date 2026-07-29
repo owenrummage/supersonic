@@ -1043,6 +1043,10 @@ func (p *playbackEngine) getMediaURLForIdx(idx int) string {
 			}
 		}
 		url, _ = p.sm.Server.GetStreamURL(tr.ID, ts, p.transcodeCfg.ForceRawFile)
+	} else if ep, ok := item.(*mediaprovider.PodcastEpisode); ok {
+		if ep.Playable() {
+			url, _ = p.sm.Server.GetStreamURL(ep.StreamID, nil, true)
+		}
 	} else {
 		url = item.(*mediaprovider.RadioStation).StreamURL
 	}

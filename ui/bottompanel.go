@@ -53,6 +53,8 @@ func NewBottomPanel(pm *backend.PlaybackManager, im *backend.ImageManager, contr
 	}))
 
 	bp.NowPlaying = widgets.NewNowPlayingCard()
+	_, canShare := contr.App.ServerManager.Server.(mediaprovider.SupportsSharing)
+	bp.NowPlaying.DisableSharing = !canShare
 	bp.NowPlaying.ShowAlbumYear = cfg.AlbumsPage.ShowYears
 	bp.NowPlaying.OnCoverTapped = func() {
 		contr.NavigateTo(controller.NowPlayingRoute())
@@ -87,8 +89,13 @@ func NewBottomPanel(pm *backend.PlaybackManager, im *backend.ImageManager, contr
 		}
 	}
 	bp.NowPlaying.OnShare = func() {
-		if tr, ok := pm.NowPlaying().(*mediaprovider.Track); ok {
-			contr.ShowShareDialog(tr.ID)
+		switch item := pm.NowPlaying().(type) {
+		case *mediaprovider.Track:
+			contr.ShowShareDialog(item.ID)
+		case *mediaprovider.PodcastEpisode:
+			if item.StreamID != "" {
+				contr.ShowShareDialog(item.StreamID)
+			}
 		}
 	}
 	bp.Controls = widgets.NewPlayerControls(cfg.Playback.UseWaveformSeekbar, pm.GetLoopMode(), pm.IsShuffle())

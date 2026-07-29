@@ -3,11 +3,15 @@ package backend
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dweymouth/go-jellyfin"
@@ -26,6 +30,9 @@ type ServerManager struct {
 	Server       mediaprovider.MediaProvider
 
 	useKeyring        bool
+	storePasswords    bool
+	credentialFile    string
+	credentialFileMu  sync.Mutex
 	prefetchCoverCB   func(string)
 	appName           string
 	appVersion        string
@@ -36,12 +43,14 @@ type ServerManager struct {
 
 var ErrUnreachable = errors.New("server is unreachable")
 
-func NewServerManager(appName, appVersion string, config *Config, useKeyring bool) *ServerManager {
+func NewServerManager(appName, appVersion string, config *Config, configDir string, storePasswords, useKeyring bool) *ServerManager {
 	return &ServerManager{
-		appName:    appName,
-		appVersion: appVersion,
-		config:     config,
-		useKeyring: useKeyring,
+		appName:        appName,
+		appVersion:     appVersion,
+		config:         config,
+		useKeyring:     useKeyring,
+		storePasswords: storePasswords,
+		credentialFile: filepath.Join(configDir, "credentials.json"),
 	}
 }
 
@@ -147,9 +156,13 @@ func (s *ServerManager) Logout(deletePassword bool) {
 }
 
 func (s *ServerManager) deleteServerPassword(serverID uuid.UUID) {
-	if s.useKeyring {
-		keyring.Delete(s.appName, s.ServerID.String())
+	if !s.storePasswords {
+		return
 	}
+	if s.useKeyring {
+		_ = keyring.Delete(s.appName, serverID.String())
+	}
+	_ = s.deleteFilePassword(serverID)
 }
 
 // Sets a callback that is invoked when a server is connected to.
@@ -163,17 +176,111 @@ func (s *ServerManager) OnLogout(cb func()) {
 }
 
 func (s *ServerManager) GetServerPassword(serverID uuid.UUID) (string, error) {
-	if s.useKeyring {
-		return keyring.Get(s.appName, serverID.String())
+	if !s.storePasswords {
+		return "", errors.New("password storage not enabled")
 	}
-	return "", errors.New("keyring not enabled")
+	if s.useKeyring {
+		if password, err := keyring.Get(s.appName, serverID.String()); err == nil {
+			return password, nil
+		} else {
+			log.Printf("OS keyring unavailable, using local credential store: %v", err)
+		}
+	}
+	return s.getFilePassword(serverID)
 }
 
 func (s *ServerManager) SetServerPassword(server *ServerConfig, password string) error {
-	if s.useKeyring {
-		return keyring.Set(s.appName, server.ID.String(), password)
+	if !s.storePasswords {
+		return errors.New("password storage not enabled")
 	}
-	return errors.New("keyring not available")
+	if s.useKeyring {
+		if err := keyring.Set(s.appName, server.ID.String(), password); err == nil {
+			_ = s.deleteFilePassword(server.ID)
+			return nil
+		} else {
+			log.Printf("OS keyring unavailable, using local credential store: %v", err)
+		}
+	}
+	return s.setFilePassword(server.ID, password)
+}
+
+func (s *ServerManager) readFilePasswords() (map[string]string, error) {
+	passwords := make(map[string]string)
+	data, err := os.ReadFile(s.credentialFile)
+	if errors.Is(err, os.ErrNotExist) {
+		return passwords, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, &passwords); err != nil {
+		return nil, fmt.Errorf("read saved credentials: %w", err)
+	}
+	return passwords, nil
+}
+
+func (s *ServerManager) writeFilePasswords(passwords map[string]string) error {
+	tmp, err := os.CreateTemp(filepath.Dir(s.credentialFile), ".credentials-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := json.NewEncoder(tmp).Encode(passwords); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, s.credentialFile)
+}
+
+func (s *ServerManager) getFilePassword(serverID uuid.UUID) (string, error) {
+	s.credentialFileMu.Lock()
+	defer s.credentialFileMu.Unlock()
+	passwords, err := s.readFilePasswords()
+	if err != nil {
+		return "", err
+	}
+	password, ok := passwords[serverID.String()]
+	if !ok {
+		return "", errors.New("no saved password")
+	}
+	return password, nil
+}
+
+func (s *ServerManager) setFilePassword(serverID uuid.UUID, password string) error {
+	s.credentialFileMu.Lock()
+	defer s.credentialFileMu.Unlock()
+	passwords, err := s.readFilePasswords()
+	if err != nil {
+		return err
+	}
+	passwords[serverID.String()] = password
+	return s.writeFilePasswords(passwords)
+}
+
+func (s *ServerManager) deleteFilePassword(serverID uuid.UUID) error {
+	s.credentialFileMu.Lock()
+	defer s.credentialFileMu.Unlock()
+	passwords, err := s.readFilePasswords()
+	if err != nil {
+		return err
+	}
+	delete(passwords, serverID.String())
+	if len(passwords) == 0 {
+		err := os.Remove(s.credentialFile)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	return s.writeFilePasswords(passwords)
 }
 
 func (s *ServerManager) connect(connection ServerConnection, password string) (mediaprovider.Server, error) {

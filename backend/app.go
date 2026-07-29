@@ -25,7 +25,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/20after4/configdir"
-	"github.com/zalando/go-keyring"
 )
 
 const (
@@ -57,6 +56,7 @@ type App struct {
 	LocalPlayer     *mpv.Player
 	UpdateChecker   UpdateChecker
 	MPRISHandler    *MPRISHandler
+	DiscordPresence *DiscordPresence
 	WinSMTC         *windows.SMTC
 	ipcServer       ipc.IPCServer
 
@@ -150,7 +150,8 @@ func StartupApp(appName, displayAppName, appVersion, appVersionTag, latestReleas
 		return nil, err
 	}
 
-	a.ServerManager = NewServerManager(appName, appVersion, a.Config, !portableMode && a.Config.Application.EnablePasswordStorage)
+	a.ServerManager = NewServerManager(appName, appVersion, a.Config, confDir,
+		a.Config.Application.EnablePasswordStorage, !portableMode)
 	a.ImageManager = NewImageManager(a.bgrndCtx, a.ServerManager, cacheDir)
 	if a.Config.Playback.UseWaveformSeekbar {
 		ac, err := NewAudioCache(a.bgrndCtx, a.ServerManager, filepath.Join(cacheDir, audioCacheSubdir))
@@ -215,6 +216,9 @@ func StartupApp(appName, displayAppName, appVersion, appVersionTag, latestReleas
 	a.PlaybackManager.OnSongChange(func(_ mediaprovider.MediaItem, _ *mediaprovider.Track) {
 		go a.SavePlayQueueIfEnabled()
 	})
+	a.DiscordPresence = NewDiscordPresence(a.PlaybackManager, func() mediaprovider.MediaProvider {
+		return a.ServerManager.GetServer()
+	}, newMusicBrainzArtworkResolver(a.bgrndCtx, fmt.Sprintf("Supersonic/%s (%s)", appVersion, latestReleaseURL)))
 
 	// Start IPC server if another not already running in a different instance
 	if cli == nil {
@@ -559,9 +563,9 @@ func (a *App) LoginToDefaultServer() error {
 	if serverCfg == nil {
 		return ErrNoServers
 	}
-	pass, err := keyring.Get(a.appName, serverCfg.ID.String())
+	pass, err := a.ServerManager.GetServerPassword(serverCfg.ID)
 	if err != nil {
-		return fmt.Errorf("error reading keyring credentials: %v", err)
+		return fmt.Errorf("error reading saved credentials: %v", err)
 	}
 	return a.ServerManager.ConnectToServer(serverCfg, pass)
 }
@@ -603,6 +607,9 @@ func (a *App) Shutdown() {
 	}
 	if a.WinSMTC != nil {
 		a.WinSMTC.Shutdown()
+	}
+	if a.DiscordPresence != nil {
+		a.DiscordPresence.Shutdown()
 	}
 	a.PlaybackManager.DisableCallbacks()
 	a.PlaybackManager.Shutdown() // will trigger scrobble check

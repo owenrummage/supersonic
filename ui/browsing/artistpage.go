@@ -686,7 +686,7 @@ func (a *ArtistPageHeader) Clear() {
 	a.fullSizeCoverFetching = false
 }
 
-func (a *ArtistPageHeader) Update(artist *mediaprovider.ArtistWithAlbums, im *backend.ImageManager) {
+func (a *ArtistPageHeader) Update(artist *mediaprovider.ArtistWithAlbums, _ *backend.ImageManager) {
 	if artist == nil {
 		return
 	}
@@ -695,17 +695,6 @@ func (a *ArtistPageHeader) Update(artist *mediaprovider.ArtistWithAlbums, im *ba
 	a.artistID = artist.ID
 	a.titleDisp.Segments[0].(*widget.TextSegment).Text = artist.Name
 	a.titleDisp.Refresh()
-	if artist.CoverArtID == "" {
-		return
-	}
-	a.artistImageID = artist.CoverArtID
-	go func() {
-		if cover, err := im.GetCoverThumbnail(artist.CoverArtID); err == nil {
-			fyne.Do(func() { a.artistImage.SetImage(cover, true) })
-		} else {
-			log.Printf("error fetching cover: %v", err)
-		}
-	}()
 }
 
 func (a *ArtistPageHeader) UpdateInfo(info *mediaprovider.ArtistInfo) {

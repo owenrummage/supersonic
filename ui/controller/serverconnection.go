@@ -35,6 +35,7 @@ func (m *Controller) PromptForFirstServer() {
 					SkipSSLVerify: d.SkipSSLVerify,
 				}
 				server := m.App.ServerManager.AddServer(d.Nickname, conn)
+				server.EnablePodcasts = d.EnablePodcasts
 				if err := m.trySetPasswordAndConnectToServer(server, d.Password); err != nil {
 					log.Printf("error connecting to server: %s", err.Error())
 				}
@@ -67,41 +68,15 @@ func (c *Controller) DoConnectToServerWorkflow(server *backend.ServerConfig) {
 }
 
 func (c *Controller) doConnectWithPassword(server *backend.ServerConfig, pass string) {
-	canceled := false
-	ctx, cancel := context.WithCancel(context.Background())
-	dlg := dialog.NewCustom(lang.L("Connecting"), lang.L("Cancel"),
-		widget.NewLabel(fmt.Sprintf(lang.L("Connecting to")+" %s", server.Nickname)), c.MainWindow)
-	dlg.SetOnClosed(func() {
-		canceled = true
-		cancel()
-	})
-	c.haveModal = true
-	dlg.Show()
-
-	// try to connect
 	go func() {
-		defer cancel() // make sure to free up ctx resources if user does not cancel
-
-		if err := c.tryConnectToServer(ctx, server, pass); err != nil {
+		if err := c.tryConnectToServer(context.Background(), server, pass); err != nil {
 			fyne.Do(func() {
-				dlg.Hide()
-				c.haveModal = false
-				if canceled {
+				dlg := dialog.NewError(err, c.MainWindow)
+				dlg.SetOnClosed(func() {
 					c.PromptForLoginAndConnect()
-				} else {
-					// connection failure
-					dlg := dialog.NewError(err, c.MainWindow)
-					dlg.SetOnClosed(func() {
-						c.PromptForLoginAndConnect()
-					})
-					c.haveModal = true
-					dlg.Show()
-				}
-			})
-		} else {
-			fyne.Do(func() {
-				dlg.Hide()
-				c.haveModal = false
+				})
+				c.haveModal = true
+				dlg.Show()
 			})
 		}
 	}()
@@ -150,6 +125,7 @@ func (m *Controller) PromptForLoginAndConnect() {
 						server.Username = editD.Username
 						server.LegacyAuth = editD.LegacyAuth
 						server.SkipSSLVerify = editD.SkipSSLVerify
+						server.EnablePodcasts = editD.EnablePodcasts
 						m.trySetPasswordAndConnectToServer(server, editD.Password)
 						m.doModalClosed()
 					}
@@ -184,6 +160,7 @@ func (m *Controller) PromptForLoginAndConnect() {
 							SkipSSLVerify: newD.SkipSSLVerify,
 						}
 						server := m.App.ServerManager.AddServer(newD.Nickname, conn)
+						server.EnablePodcasts = newD.EnablePodcasts
 						m.trySetPasswordAndConnectToServer(server, newD.Password)
 						m.doModalClosed()
 					}
